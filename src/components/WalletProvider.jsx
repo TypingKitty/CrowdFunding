@@ -33,6 +33,7 @@ export function WalletProvider({ children }) {
         setProvider(prov);
         setSigner(sign);
         setAccount(accounts[0]);
+        
     } catch (error) {
       console.error("Error connecting wallet:", error);
     }
@@ -50,6 +51,7 @@ export function WalletProvider({ children }) {
           setProvider(prov);
           setSigner(sign);
           setAccount(accounts[0]);
+          console.log(prov,sign,accounts[0]);
         }
       } catch (error) {
         console.error("Error checking connection:", error);

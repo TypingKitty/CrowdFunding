@@ -1,14 +1,12 @@
-// filepath: /c:/Users/PRANAMY/Documents/VSC/block/scripts/deploy.js
 const hre = require("hardhat");
 const { ethers } = hre;
 
 async function main() {
   const CampaignFactory = await ethers.getContractFactory("CampaignFactory");
   const campaignFactory = await CampaignFactory.deploy();
+  await campaignFactory.waitForDeployment();
 
-  await campaignFactory.deployed();
-
-  console.log("CampaignFactory deployed to:", campaignFactory.address);
+  console.log("CampaignFactory deployed to:", campaignFactory.target);
 }
 
 main()

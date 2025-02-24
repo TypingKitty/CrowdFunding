@@ -8,7 +8,7 @@ contract CampaignFactory{
     mapping(address=>Campaign[])  mappedCampaigns;
     function createCampaign(string memory _name , string memory _description , string memory _pic , uint256 _goal , uint256 _durationindays, string memory _genres) external
     {
-        Campaign campaign = new Campaign( _name ,  _description ,  _pic ,  _goal ,  _durationindays,  _genres);
+        Campaign campaign = new Campaign( _name ,  _description ,  _pic ,  _goal ,  _durationindays,  _genres,msg.sender);
         campaigns.push(campaign);
         mappedCampaigns[msg.sender].push(campaign);
     }
