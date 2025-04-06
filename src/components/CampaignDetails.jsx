@@ -5,7 +5,7 @@ import ReleaseRequestModal from './ReleaseRequestModal'; // Import the ReleaseRe
 import { useContract } from './ContractProvider';
 import { ethers } from 'ethers';
 import { useWallet } from './WalletProvider';
-
+import Requests from './Requests';
 const CampaignDetails = () => {
   const { id } = useParams();
   const [isDonateModalOpen, setIsDonateModalOpen] = useState(false);
@@ -15,7 +15,6 @@ const CampaignDetails = () => {
   const { signer, account } = useWallet();
   const [campaign, setCampaign] = useState(null);
   const [campaignContract, setCampaignContract] = useState(null);
-
   const getDetails = async () => {
     try {
       if (!signer || !campaignFactory) {
@@ -25,38 +24,48 @@ const CampaignDetails = () => {
       const myCampaigns = await campaignFactory.getAllCampaigns();
       const contract = new ethers.Contract(myCampaigns[id], campaignABI, signer);
       setCampaignContract(contract);
-      const title = await contract.name();
-      const description = await contract.description();
-      const bannerImageURL = await contract.pic();
-      const goal = (await contract.goal()).toString();
-      const durationInDays = (await contract.durationindays()).toString();
-      const state = await contract.status();
-      const currentFundsRaised = (await contract.fundRaised()).toString();
-      const fundsReleased = (BigInt(currentFundsRaised) - BigInt(await contract.getBalance())).toString();
-      const startDate = (await contract.startdate()).toString();
-      const endDate = (BigInt(startDate) + BigInt(durationInDays) * BigInt(86400)).toString();
-      const beneficiary = await contract.owner();
-      const donors = await contract.getContributors();
-      const releaseRequests = await Promise.all(
-        Array.from({ length: Number(await contract.requestIndex()) }, async (_, i) =>
-          contract.getWithdrawRequest(i)
-        )
-      );
-      console.log(releaseRequests);
+      
+      var [title , description , bannerImageURL , goal , state , durationInDays , currentFundsRaised , startDate , donors ,beneficiary ] = await contract.getCampaignDetalis1();
+      var [donations , requestsStatus , requestsAmt , requestsProof] = await contract.getCampaignDetails2();
+
+      
+      if(new Date(Number(durationInDays)*1000) < new Date() && state == 0) {
+        state = BigInt(2);
+      }
+      switch(state) {
+        case BigInt(0) : state = "Open";
+        break;
+        case BigInt(1) : state = "Completed";
+        break;
+        case BigInt(2) : state = "Expired";
+        break;
+        case BigInt(3) : state = "Ended";
+        break;
+      }
+      const updatedRequestsStatus = requestsStatus.map((status) => {
+        if (status == 0) {
+          return "Accepted";
+        } else if (status == 1) {
+          return "Rejected";
+        } else {
+          return "Pending";
+        }
+      });
       setCampaign({
         title,
         description,
         bannerImageURL,
-        goal,
-        durationInDays,
+        goal: Number(goal),
+        durationInDays: new Date(Number(durationInDays) * 1000).toLocaleDateString(),
         state,
-        currentFundsRaised,
-        fundsReleased,
-        startDate,
-        endDate,
-        beneficiary,
+        currentFundsRaised: Number(currentFundsRaised),
+        startDate: new Date(Number(startDate) * 1000).toLocaleDateString(),
         donors,
-        releaseRequests
+        beneficiary,
+        requestsStatus:updatedRequestsStatus,
+        requestsAmt,
+        requestsProof,
+        donations //add fundReleased field
       });
     } catch (error) {
       console.error('Error fetching campaigns:', error);
@@ -73,9 +82,9 @@ const CampaignDetails = () => {
     return <div>Loading...</div>;
   }
 
-  const isActiveAndNotGoalReached = campaign.state === BigInt(0) && BigInt(campaign.currentFundsRaised) < BigInt(campaign.goal);
+  
   const isNotBeneficiary = campaign.beneficiary.toLowerCase() !== account.toLowerCase();
-
+  const isContributor = campaign.donors.some(donor => donor.toLowerCase() == account.toLowerCase());
   const containerStyle = {
     maxWidth: '1200px',
     margin: '2rem auto',
@@ -181,13 +190,12 @@ const CampaignDetails = () => {
 
     try {
       setIsProcessing(true);
-      const tx = await campaignContract.fund({
-        value: amount // Convert the amount to wei
+      const tx = await campaignContract.fund(account,{
+        value: amount
       });
       await tx.wait();
       alert('Donation successful!');
       setIsDonateModalOpen(false);
-      // You might want to refresh the campaign data here
     } catch (error) {
       console.error('Donation failed:', error);
       alert('Donation failed: ' + error.message);
@@ -204,11 +212,10 @@ const CampaignDetails = () => {
 
     try {
       setIsProcessing(true);
-      const tx = await campaignContract.createWithdrawRequest(amount, proof);
+      const tx = await campaignContract.createWithdrawRequest(amount, proof,account);
       await tx.wait();
       alert('Release request created successfully!');
       setIsReleaseRequestModalOpen(false);
-      // You might want to refresh the campaign data here
     } catch (error) {
       console.error('Release request creation failed:', error);
       alert('Release request creation failed: ' + error.message);
@@ -227,30 +234,30 @@ const CampaignDetails = () => {
       <div style={gridStyle}>
         <div style={statCardStyle}>
           <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Goal Amount</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>{campaign.goal} ETH</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>{campaign.goal} Wei</div>
         </div>
         
         <div style={statCardStyle}>
           <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Funds Raised</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>{campaign.currentFundsRaised} ETH</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>{campaign.currentFundsRaised} Wei</div>
         </div>
 
         <div style={statCardStyle}>
           <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Funds Released</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>{campaign.fundsReleased} ETH</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>{campaign.fundsReleased} Wei</div>
         </div>
 
         <div style={statCardStyle}>
           <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Start Date</div>
           <div style={{ fontSize: '1.125rem', color: '#1f2937' }}>
-            {new Date(Number(campaign.startDate) * 1000).toLocaleDateString()}
+            {campaign.startDate}
           </div>
         </div>
 
         <div style={statCardStyle}>
           <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>End Date</div>
           <div style={{ fontSize: '1.125rem', color: '#1f2937' }}>
-            {new Date(Number(campaign.endDate) * 1000).toLocaleDateString()}
+            {campaign.durationInDays}
           </div>
         </div>
 
@@ -259,32 +266,12 @@ const CampaignDetails = () => {
           <div style={{ fontSize: '1rem', color: '#1f2937', wordBreak: 'break-all' }}>{campaign.beneficiary}</div>
         </div>
       </div>
-
-      {campaign.donors.includes(account) && (
-        <div style={requestsContainerStyle}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem' }}>Fund Release Requests</h2>
-          {campaign.releaseRequests.map((request, index) => (
-            <div key={index} style={requestCardStyle}>
-              <div>
-                <div style={{ fontWeight: '500', marginBottom: '0.5rem' }}>Amount: {request.amount} ETH</div>
-                <div style={{ color: '#6b7280' }}>Proof: {request.proofOfUsage}</div>
-                <div style={{ 
-                  color: request.status === 'Pending' ? '#eab308' : '#10b981',
-                  fontWeight: '500',
-                  marginTop: '0.5rem'
-                }}>
-                  Status: {request.status}
-                </div>
-              </div>
-              {request.status === "Pending" && (
-                <button style={voteButtonStyle}>Vote</button>
-              )}
-            </div>
-          ))}
-        </div>
+      {
+      campaign.donors.some(donor => donor.toLowerCase === account.toLowerCase) && (
+        <Requests isContributor={isContributor} account={account} campaignContract={campaignContract} status={campaign.requestsStatus} proof={campaign.requestsProof} amt={campaign.requestsAmt} hasVoted setHasVoted />
       )}
 
-      {isNotBeneficiary && isActiveAndNotGoalReached && (
+      {isNotBeneficiary && campaign.state == "Open" && (
         <div style={{ 
           textAlign: 'center',
           marginTop: '2rem',

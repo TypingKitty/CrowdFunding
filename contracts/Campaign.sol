@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-
 pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "hardhat/console.sol";
-
 contract Campaign {
     enum VotingStatus {Accepted, Rejected, Pending}
     enum CampaignStatus {Opened, Completed, Expired, Ended}
@@ -16,32 +14,35 @@ contract Campaign {
         string ipfsproofadd;
     } // withdraw requested by the owner of the campaign. The amount will be stored in the sc until then
 
-    uint256 public goal;
-    string public name;
-    string public description;
-    string public pic;
-    uint256 public fundRaised;
-    uint256 public durationindays;
-    uint256 public startdate;
-    uint256 public requestIndex;
-    string public genres;
+    uint256 private goal;
+    string private name;
+    string private description;
+    string private pic;
+    uint256 private fundRaised;
+    uint256 private durationindays;
+    uint256 private startdate;
+    uint256 private requestIndex;
+    string private genres;
 
     address payable public owner; // address of the contract(decentralized) or wallet that creates the contract(crowd-contract)
     address[] public contributors;
     mapping(address => uint256) public contributions; // map to store address of a person with an int value
     withdrawRequest[] public requests;
-    CampaignStatus public status;
+    CampaignStatus private status;
 
     function getContributors() public view returns (address[] memory) {
         return contributors;
     }
 
-    function getWithdrawRequest(uint256 _index) external view returns (uint256, uint8, uint256, string memory) {
-        require(_index < requests.length, "Invalid request index");
-        withdrawRequest storage request = requests[_index];
-        return (request.date, uint8(request.status), request.amt, request.ipfsproofadd);
+    // working in remix
+    function getWithdrawRequestInfo(uint _index) public view returns(address[] memory , uint[] memory,uint256,uint256,uint256,string memory)
+    {
+        
+        uint[] memory res = new uint[](contributors.length);
+        for(uint i=0;i<contributors.length;i++)
+        res[i] = (uint(requests[_index].votingResult[contributors[i]]));
+        return(contributors,res, requests[_index].amt , requests[_index].date , uint(requests[_index].status), requests[_index].ipfsproofadd);
     }
-
     function getWithdrawRequestVotingResult(uint256 _index, address _contributor) external view returns (uint8) {
         require(_index < requests.length, "Invalid request index");
         return uint8(requests[_index].votingResult[_contributor]);
@@ -83,8 +84,7 @@ contract Campaign {
 
     function statusUpdate(uint8 _status) public {
         CampaignStatus statusEnum = CampaignStatus(_status);
-        if (statusEnum == CampaignStatus.Ended)
-            require(msg.sender == owner); // only owner can end it early
+        if (statusEnum == CampaignStatus.Ended) // only owner can end it early
         status = statusEnum;
     }
 
@@ -103,11 +103,11 @@ contract Campaign {
         return flag;
     }
 
-    function fund() external payable isCampaignOpen isValidTransaction { // payment will be made in ETH
-        if (check_contributor_exists(msg.sender) == false) {
-            contributors.push(msg.sender);
+    function fund(address sender) external payable isCampaignOpen isValidTransaction { // payment will be made in ETH
+        if (check_contributor_exists(sender) == false) {
+            contributors.push(sender);
         }
-        contributions[msg.sender] += msg.value;
+        contributions[sender] += msg.value;
         fundRaised += msg.value;
         if (fundRaised == goal) statusUpdate(uint8(CampaignStatus.Completed));
     }
@@ -131,8 +131,7 @@ contract Campaign {
         int v = 0;
         for (uint i = 0; i < contributors.length; i++) {
             if (requests[_i].votingResult[contributors[i]] == VotingStatus.Pending) {
-                flag = VotingStatus.Pending;
-                break;
+                return  VotingStatus.Pending;
             } else if (requests[_i].votingResult[contributors[i]] == VotingStatus.Accepted) v++;
             else v--;
         }
@@ -140,11 +139,11 @@ contract Campaign {
         return flag;
     }
 
-    function vote(uint8 _vote, uint256 _i) external { // _vote = 0 accepted, 1 = rejected
+    function vote(uint8 _vote, uint256 _i , address sender) external { // _vote = 0 accepted, 1 = rejected
         require(requests[_i].status == VotingStatus.Pending, "Votes have been closed");
-        require(requests[_i].votingResult[msg.sender] == VotingStatus.Pending, "Already voted");
-        require(contributions[msg.sender] > 0, "Only contributors can vote");
-        requests[_i].votingResult[msg.sender] = VotingStatus(_vote);
+        require(requests[_i].votingResult[sender] == VotingStatus.Pending, "Already voted");
+        require(contributions[sender] > 0, "Only contributors can vote");
+        requests[_i].votingResult[sender] = VotingStatus(_vote);
         requests[_i].status = updateVotingStatus(_i);
         if (requests[_i].status == VotingStatus.Accepted) withdraw(_i);
     }
@@ -171,6 +170,48 @@ contract Campaign {
     }
 
     delete contributors;
-}
+} //this one
+   //return genres too 
+    function getCampaignCard() external view returns(string memory , string memory , uint , string memory , uint , uint,uint,string memory)
+    {
+        return (name,description,goal,pic,uint(status),durationindays,fundRaised,genres);
+    }
 
+    function getCampaignDetalis1() external view returns(string memory, string memory , string memory , uint , uint ,uint , uint , uint ,address[] memory ,  address   ) 
+    {
+    
+
+        return (
+            name,
+            description,
+            pic,
+            goal,
+            uint(status),
+            durationindays,
+            fundRaised,
+            startdate,
+            contributors,
+            owner
+        );
+    }
+    function getCampaignDetails2() external view returns(uint[] memory, uint[] memory , uint[] memory , string[]memory)
+    {
+        uint[] memory _status = new uint[](requests.length);
+    uint[] memory amt = new uint[](requests.length);
+    string[] memory ipfsproofadd = new string[](requests.length);
+    uint[] memory _contributions = new uint[](contributors.length);
+
+    // Fill _contributions array with the contributions
+        for(uint i = 0; i < contributors.length; i++) {
+            _contributions[i] = contributions[contributors[i]];
+        }
+
+        // Fill the withdraw request details
+        for(uint i = 0; i < requests.length; i++) {
+            _status[i] = uint(requests[i].status);
+            amt[i] = requests[i].amt;
+            ipfsproofadd[i] = requests[i].ipfsproofadd;
+        }
+        return(_contributions,_status,amt,ipfsproofadd); 
+    }
 }

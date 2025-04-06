@@ -8,6 +8,10 @@ import { ContractProvider } from "./components/ContractProvider";
 import  MyCampaigns  from "./components/MyCampaigns";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AllCampaigns from "./components/AllCampaigns";
+import Dum from "./components/Dum";
+import RequestsDetails from "./components/RequestsDetails";
+import Campaigns from "./components/Campaigns";
+import Upload from "./components/Upload";
 function App() {
   return (
     <WalletProvider>
@@ -17,7 +21,8 @@ function App() {
         <Route path="/" element={
           <>
             <Header/>
-            <AllCampaigns/>
+            <Campaigns type="all"/>
+            <Upload/>
             </>
           }/>
       <Route 
@@ -34,10 +39,19 @@ function App() {
           element={
             <>
               <Header/>
-              <MyCampaigns/>
+              <Campaigns type="my"/>
             </>
           } 
         /> 
+        <Route
+        path="/campaign/:id/:reqid"
+        element={
+          <>
+            <Header/>
+            <RequestsDetails/>
+          </>
+        }
+        />
     </Routes>
   </BrowserRouter>
   </ContractProvider>

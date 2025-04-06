@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ethers } from "ethers";
-
+import axios from 'axios';
 
 const WalletContext = createContext(); // Create the context
 
@@ -19,7 +19,30 @@ export function WalletProvider({ children }) {
     setProvider(null);
     setSigner(null);
   };
+ const upload=async(file) =>{
+  const formData = new FormData();
+    formData.append("file", file);
 
+    try {
+      const res = await axios.post(
+        "https://api.pinata.cloud/pinning/pinFileToIPFS",
+        formData,
+        {
+          maxContentLength: Infinity,
+          headers: {
+            Authorization : `Bearer ${import.meta.env.VITE_PIN_JWT}`,
+          },
+        }
+      );
+      console.log(import.meta.env.VITE_PIN_KEY);
+      const cid = res.data.IpfsHash;
+      const url = `https://gateway.pinata.cloud/ipfs/${cid}`;
+      return url;
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("Upload failed.");
+    }
+ }
   // Function to connect the wallet on demand
   const connectWallet = async () => {
     if (!window.ethereum) {
@@ -38,7 +61,11 @@ export function WalletProvider({ children }) {
       console.error("Error connecting wallet:", error);
     }
   };
-
+  const votingStatus = ( s)=>{
+    if(s ==0 ) return "Accepted";
+    else if(s == 1) return "Rejected";
+    else return "Not Voted";
+  }
   // Check if already connected when the component mounts
   useEffect(() => {
     const checkConnection = async () => {
@@ -72,7 +99,7 @@ export function WalletProvider({ children }) {
   }, []);
 
   return (
-    <WalletContext.Provider value={{ account, provider, signer, connectWallet}}>
+    <WalletContext.Provider value={{upload,votingStatus, account, provider, signer, connectWallet}}>
       {children}
     </WalletContext.Provider>
   );
